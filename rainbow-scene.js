@@ -13,6 +13,10 @@ class RainbowScene {
         this.windSpeed = 3;
         this.zoom = 1;
         
+        // Storm effects
+        this.lightning = { active: false, intensity: 0, timer: 0 };
+        this.thunder = { timer: 0, volume: 0 };
+        
         // Click mode for interactive elements
         this.clickMode = 'bird'; // bird, tree, star, rain, cloud
         this.clickModes = ['bird', 'tree', 'star', 'rain', 'cloud'];
@@ -313,10 +317,10 @@ class RainbowScene {
         this.birds.push({
             x: x,
             y: y,
-            vx: (Math.random() - 0.5) * 2,
+            vx: (Math.random() - 0.5) * 4, // Increased from 2 to 4
             vy: (Math.random() - 0.5) * 2,
             wingPhase: Math.random() * Math.PI * 2,
-            wingSpeed: 0.1 + Math.random() * 0.2
+            wingSpeed: 0.2 + Math.random() * 0.3 // Increased wing speed
         });
     }
     
@@ -359,6 +363,25 @@ class RainbowScene {
         
         const gradient = this.ctx.createLinearGradient(0, 0, 0, this.canvas.height);
         
+        // Stormy weather overrides normal sky
+        if (this.weather === 'stormy') {
+            const stormGradient = this.ctx.createLinearGradient(0, 0, 0, this.canvas.height);
+            stormGradient.addColorStop(0, '#2F4F4F'); // Dark grey
+            stormGradient.addColorStop(0.3, '#4A4A4A'); // Medium grey
+            stormGradient.addColorStop(0.7, '#696969'); // Light grey
+            stormGradient.addColorStop(1, '#808080'); // Very light grey
+            
+            // Add lightning flash effect
+            if (this.lightning.active) {
+                this.ctx.fillStyle = `rgba(255, 255, 255, ${this.lightning.intensity})`;
+                this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
+            }
+            
+            this.ctx.fillStyle = stormGradient;
+            this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
+            return;
+        }
+        
         // Smooth transitions between day and night
         let dayProgress, nightProgress;
         
@@ -371,16 +394,17 @@ class RainbowScene {
             gradient.addColorStop(0.5, skyLight);
             gradient.addColorStop(1, '#B0E0E6');
         } else {
-            // Night time
+            // Night time with slower transitions
             if (this.timeOfDay < 6) {
                 nightProgress = this.timeOfDay / 6; // 0 to 1 (dawn)
             } else {
                 nightProgress = (this.timeOfDay - 18) / 6; // 0 to 1 (dusk)
             }
             
-            // Smooth transition colors
-            const nightBlue = this.lerpColor('#191970', '#000033', nightProgress);
-            const nightLight = this.lerpColor('#4169E1', '#000080', nightProgress);
+            // Slower, more gradual transition colors
+            const transitionFactor = Math.pow(nightProgress, 0.7); // Slower transition
+            const nightBlue = this.lerpColor('#191970', '#000033', transitionFactor);
+            const nightLight = this.lerpColor('#4169E1', '#000080', transitionFactor);
             gradient.addColorStop(0, nightBlue);
             gradient.addColorStop(0.5, nightLight);
             gradient.addColorStop(1, '#000033');
@@ -394,10 +418,10 @@ class RainbowScene {
         if (!this.showSun) return;
         
         if (this.timeOfDay >= 6 && this.timeOfDay <= 18) {
-            // Calculate sun position - starts in middle, rises and sets
+            // Calculate sun position - rises from horizon, sets to horizon
             const sunProgress = (this.timeOfDay - 6) / 12; // 0 to 1
             const sunX = this.canvas.width * 0.5 + (sunProgress - 0.5) * this.canvas.width * 0.8;
-            const sunY = this.canvas.height * 0.3 - Math.sin(sunProgress * Math.PI) * this.canvas.height * 0.2;
+            const sunY = this.canvas.height * 0.8 - Math.sin(sunProgress * Math.PI) * this.canvas.height * 0.5; // Starts from horizon
             
             // Sun glow
             const gradient = this.ctx.createRadialGradient(sunX, sunY, 0, sunX, sunY, 80);
@@ -422,7 +446,7 @@ class RainbowScene {
         if (!this.showMoon) return;
         
         if (this.timeOfDay < 6 || this.timeOfDay > 18) {
-            // Calculate moon position - starts in middle, rises and sets
+            // Calculate moon position - rises from horizon, sets to horizon
             let moonProgress;
             if (this.timeOfDay < 6) {
                 moonProgress = this.timeOfDay / 6; // 0 to 1 (rising)
@@ -431,7 +455,7 @@ class RainbowScene {
             }
             
             const moonX = this.canvas.width * 0.5 + (moonProgress - 0.5) * this.canvas.width * 0.8;
-            const moonY = this.canvas.height * 0.3 - Math.sin(moonProgress * Math.PI) * this.canvas.height * 0.2;
+            const moonY = this.canvas.height * 0.8 - Math.sin(moonProgress * Math.PI) * this.canvas.height * 0.5; // Starts from horizon
             
             // Moon glow
             const gradient = this.ctx.createRadialGradient(moonX, moonY, 0, moonX, moonY, 60);
@@ -486,6 +510,40 @@ class RainbowScene {
         
         // Hide clouds in sunny weather
         if (this.weather === 'sunny') return;
+        
+        // Stormy weather gets complete cloud cover
+        if (this.weather === 'stormy') {
+            // Draw storm clouds covering the entire sky
+            for (let i = 0; i < 20; i++) {
+                const x = (i * 200) % this.canvas.width;
+                const y = 50 + Math.sin(i * 0.5) * 30;
+                const size = 80 + Math.random() * 120;
+                
+                this.ctx.fillStyle = `rgba(100, 100, 100, 0.8)`;
+                
+                // Draw storm cloud
+                this.ctx.beginPath();
+                this.ctx.arc(x, y, size * 0.3, 0, Math.PI * 2);
+                this.ctx.fill();
+                
+                this.ctx.beginPath();
+                this.ctx.arc(x + size * 0.3, y, size * 0.4, 0, Math.PI * 2);
+                this.ctx.fill();
+                
+                this.ctx.beginPath();
+                this.ctx.arc(x + size * 0.6, y, size * 0.3, 0, Math.PI * 2);
+                this.ctx.fill();
+                
+                this.ctx.beginPath();
+                this.ctx.arc(x + size * 0.2, y - size * 0.2, size * 0.3, 0, Math.PI * 2);
+                this.ctx.fill();
+                
+                this.ctx.beginPath();
+                this.ctx.arc(x + size * 0.5, y - size * 0.2, size * 0.3, 0, Math.PI * 2);
+                this.ctx.fill();
+            }
+            return;
+        }
         
         this.clouds.forEach(cloud => {
             this.ctx.fillStyle = `rgba(255, 255, 255, ${cloud.opacity})`;
@@ -560,10 +618,10 @@ class RainbowScene {
                 
                 this.ctx.restore();
                 
-                // Update leaf position
-                leaf.x += leaf.vx;
+                // Update leaf position with wind effect
+                leaf.x += leaf.vx + this.windSpeed * 0.5;
                 leaf.y += leaf.vy;
-                leaf.rotation += leaf.rotationSpeed;
+                leaf.rotation += leaf.rotationSpeed + this.windSpeed * 0.01;
                 
                 // Keep leaves in bounds
                 if (leaf.x < -leaf.size) leaf.x = this.canvas.width + leaf.size;
@@ -783,10 +841,45 @@ class RainbowScene {
         
         this.ctx.restore();
         
+        // Update storm effects
+        this.updateStormEffects();
+        
         // Update debug info
         this.updateDebugInfo();
         
         requestAnimationFrame(() => this.animate());
+    }
+    
+    updateStormEffects() {
+        if (this.weather === 'stormy') {
+            // Random lightning strikes
+            if (Math.random() < 0.02) { // 2% chance per frame
+                this.lightning.active = true;
+                this.lightning.intensity = 0.8;
+                this.lightning.timer = 5;
+                
+                // Trigger thunder after lightning
+                this.thunder.timer = 30;
+                this.thunder.volume = 0.8;
+            }
+            
+            // Update lightning effect
+            if (this.lightning.active) {
+                this.lightning.timer--;
+                this.lightning.intensity = Math.max(0, this.lightning.intensity - 0.1);
+                
+                if (this.lightning.timer <= 0) {
+                    this.lightning.active = false;
+                    this.lightning.intensity = 0;
+                }
+            }
+            
+            // Update thunder effect
+            if (this.thunder.timer > 0) {
+                this.thunder.timer--;
+                this.thunder.volume = Math.max(0, this.thunder.volume - 0.02);
+            }
+        }
     }
     
     updateDebugInfo() {
@@ -800,7 +893,9 @@ class RainbowScene {
                 Click Mode: ${this.clickMode}<br>
                 Time: ${this.timeOfDay.toFixed(1)}<br>
                 Raindrops: ${this.raindrops.length}<br>
-                Leaves: ${this.leaves.length}
+                Leaves: ${this.leaves.length}<br>
+                Lightning: ${this.lightning.active ? '⚡' : '⚪'}<br>
+                Thunder: ${this.thunder.timer > 0 ? '🔊' : '🔇'}
             `;
         }
     }
